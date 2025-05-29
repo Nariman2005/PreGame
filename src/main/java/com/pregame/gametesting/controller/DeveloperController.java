@@ -4,12 +4,6 @@ import com.pregame.gametesting.dao.GameDAO;
 import com.pregame.gametesting.model.Game;
 import com.pregame.gametesting.dao.TesterFeedbackDAO;
 import com.pregame.gametesting.model.Review; // <--- IMPORT THIS
-//import com.pregame.gametesting.model; // This generic import is usually not needed if specific classes are imported
-
-// Remove TesterDAO and Tester model if not used in this specific controller's logic
-// import com.pregame.gametesting.dao.TesterDAO;
-// import com.pregame.gametesting.model.Tester;
-
 import com.pregame.gametesting.model.User;
 import com.pregame.gametesting.model.GameDeveloper;
 import jakarta.servlet.ServletException;
@@ -20,12 +14,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.ArrayList; // Keep if used elsewhere, not directly in the new method
-import java.util.HashMap;   // Keep if used elsewhere
 import java.util.List;
-import java.util.Map;     // Keep if used elsewhere
+    // Keep if used elsewhere
 
-@WebServlet(urlPatterns ={"/developer/*","/developer/reviews-feedbacks"})
+@WebServlet(urlPatterns ={"/developer/*","/developer/reviews-feedbacks", "/upload-game"})
 public class DeveloperController extends HttpServlet {
 
     private GameDAO gameDAO;
@@ -48,6 +40,10 @@ public class DeveloperController extends HttpServlet {
         // Normalize action for direct mapping
         if (servletPath.equals("/developer/reviews-feedbacks") && (action == null || action.equals("/"))) {
             action = "/reviews-feedbacks";
+        } else if (servletPath.equals("/upload-game")) {
+            // Handle the upload-game request
+            showUploadGameForm(request, response);
+            return;
         }
 
         if (action == null || action.equals("/")) {
@@ -55,7 +51,7 @@ public class DeveloperController extends HttpServlet {
         } else if (action.equals("/games")) {
             showDeveloperGames(request, response);
         } else if (action.equals("/reviews-feedbacks")) {
-            showDeveloperFeedback(request, response); // <--- CALL NEW METHOD
+            showDeveloperFeedback(request, response);// <--- CALL NEW METHOD
         } else {
             System.out.println("DeveloperController: Unknown action '" + action + "'. Sending 404.");
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "The requested developer resource was not found.");
@@ -65,11 +61,7 @@ public class DeveloperController extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        // Delegate POST requests to doGet or handle them separately if needed
-        // For simplicity, many informational pages can just use doGet logic
-        // String action = request.getParameter("action");
-        // if ("somePostAction".equals(action)) { handleMyPostAction(); }
-        // else { doGet(request,response); }
+
         doGet(request, response);
     }
 
@@ -77,7 +69,6 @@ public class DeveloperController extends HttpServlet {
             throws ServletException, IOException {
         response.sendRedirect(request.getContextPath() + "/developer/games");
     }
-
     private void showDeveloperGames(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         HttpSession session = request.getSession(false);
@@ -146,6 +137,7 @@ public class DeveloperController extends HttpServlet {
     }
 
 
+
     // NEW METHOD to show developer feedback
     private void showDeveloperFeedback(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -196,7 +188,27 @@ public class DeveloperController extends HttpServlet {
             System.err.println("Error retrieving developer feedback for ID " + developerId + ": " + e.getMessage());
             e.printStackTrace();
             request.setAttribute("errorMessage", "An error occurred while retrieving feedback: " + e.getMessage());
-            request.getRequestDispatcher("/jsp/error.jsp").forward(request, response); // Example error page
         }
+    }
+
+    // Add a new method to handle the upload game form request
+    private void showUploadGameForm(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        // Check if user is logged in and is a developer
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("user") == null) {
+            response.sendRedirect(request.getContextPath() + "/auth?action=login");
+            return;
+        }
+
+        User user = (User) session.getAttribute("user");
+        if (!User.TYPE_DEVELOPER.equals(user.getUserType())) {
+            request.setAttribute("errorMessage", "Access denied. Only developers can upload games.");
+            request.getRequestDispatcher("/jsp/Profiles/developer_profile.jsp").forward(request, response);
+            return;
+        }
+
+        // Forward to the upload game form
+        request.getRequestDispatcher("/jsp/developer/upload-game.jsp").forward(request, response);
     }
 }

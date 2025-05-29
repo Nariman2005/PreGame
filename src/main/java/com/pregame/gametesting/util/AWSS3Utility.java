@@ -7,14 +7,17 @@ import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 public class AWSS3Utility {
-
+    private static final Logger logger = Logger.getLogger(AWSS3Utility.class.getName());
     private static final String BUCKET_NAME;
     private static final String ACCESS_KEY;
     private static final String SECRET_KEY;
@@ -52,37 +55,46 @@ public class AWSS3Utility {
     }
 
     /**
+     * Get the S3 bucket name used by the application
+     * @return The bucket name
+     */
+    public static String getBucketName() {
+        return BUCKET_NAME;
+    }
+
+    /**
      * Uploads a file to AWS S3 and returns the download URL
      */
     public static String uploadFile(InputStream inputStream, String fileName, String contentType, long fileSize) {
         try {
-            System.out.println("[AWSS3Utility] Starting file upload to AWS S3");
-            System.out.println("[AWSS3Utility] File: " + fileName + ", Size: " + fileSize + " bytes, Type: " + contentType);
+            logger.info("[AWSS3Utility] Starting file upload to AWS S3");
+            logger.info("[AWSS3Utility] File: " + fileName + ", Size: " + fileSize + " bytes, Type: " + contentType);
 
             // Create unique file key
             String uniqueId = UUID.randomUUID().toString();
             String sanitizedFileName = sanitizeFileName(fileName);
             String fileKey = "uploads/" + uniqueId + "_" + sanitizedFileName;
 
-            // Configure upload request
+            // Configure upload request with public-read ACL
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(BUCKET_NAME)
                     .key(fileKey)
                     .contentType(contentType)
+                    .acl(ObjectCannedACL.PUBLIC_READ) // Make the file publicly readable
                     .build();
 
             // Upload file to S3
             s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(inputStream, fileSize));
 
-            System.out.println("[AWSS3Utility] File uploaded successfully to S3: " + fileKey);
+            logger.info("[AWSS3Utility] File uploaded successfully to S3: " + fileKey);
 
             // Return the full URL to the uploaded file
             String downloadUrl = BASE_URL + fileKey;
-            System.out.println("[AWSS3Utility] Generated download URL: " + downloadUrl);
+            logger.info("[AWSS3Utility] Generated download URL: " + downloadUrl);
             return downloadUrl;
 
         } catch (Exception e) {
-            System.err.println("[AWSS3Utility] ERROR uploading to S3: " + e.getMessage());
+            logger.log(Level.SEVERE, "[AWSS3Utility] ERROR uploading to S3: " + e.getMessage(), e);
             e.printStackTrace();
             throw new RuntimeException("Failed to upload file to S3: " + e.getMessage(), e);
         }
@@ -97,7 +109,6 @@ public class AWSS3Utility {
         }
         return fileName.replaceAll("[^a-zA-Z0-9.-]", "_");
     }
-    // Add these methods to your existing AWSS3Utility class
 
     /**
      * Contains metadata about an S3 object
@@ -131,13 +142,16 @@ public class AWSS3Utility {
      * @param key The key of the S3 object
      * @return S3ObjectInfo containing metadata or null if object doesn't exist
      */
-    /**
-     * Get metadata information about an S3 object
-     * @param key The key of the S3 object
-     * @return S3ObjectInfo containing metadata or null if object doesn't exist
-     */
     public static S3ObjectInfo getObjectInfo(String key) {
         try {
+            // Remove leading slash from the key if present, as S3 keys don't have leading slashes
+            if (key != null && key.startsWith("/")) {
+                key = key.substring(1);
+                logger.info("[AWSS3Utility] Removed leading slash from key, using: " + key);
+            }
+
+            logger.info("[AWSS3Utility] Getting object info for key: " + key + " in bucket: " + BUCKET_NAME);
+
             software.amazon.awssdk.services.s3.model.HeadObjectRequest headObjectRequest =
                     software.amazon.awssdk.services.s3.model.HeadObjectRequest.builder()
                             .bucket(BUCKET_NAME)
@@ -147,6 +161,8 @@ public class AWSS3Utility {
             software.amazon.awssdk.services.s3.model.HeadObjectResponse metadata =
                     s3Client.headObject(headObjectRequest);
 
+            logger.info("[AWSS3Utility] Found object in S3: " + key + ", content type: " + metadata.contentType() + ", size: " + metadata.contentLength() + " bytes");
+
             return new S3ObjectInfo(
                     metadata.contentLength(),
                     metadata.contentType(),
@@ -154,9 +170,11 @@ public class AWSS3Utility {
             );
         } catch (software.amazon.awssdk.services.s3.model.NoSuchKeyException e) {
             // Object not found
+            logger.warning("[AWSS3Utility] Object not found in S3: " + key);
             return null;
         } catch (software.amazon.awssdk.services.s3.model.S3Exception e) {
             // Other error
+            logger.severe("[AWSS3Utility] S3 error while checking object: " + e.getMessage());
             throw e;
         }
     }
@@ -165,13 +183,17 @@ public class AWSS3Utility {
      * Download a file from S3
      * @param key The key of the S3 object
      * @return InputStream to the S3 object or null if not found
-    /**
-     * Download a file from S3
-     * @param key The key of the S3 object
-     * @return InputStream to the S3 object or null if not found
      */
     public static InputStream downloadFile(String key) {
         try {
+            // Remove leading slash from the key if present, as S3 keys don't have leading slashes
+            if (key != null && key.startsWith("/")) {
+                key = key.substring(1);
+                logger.info("[AWSS3Utility] Removed leading slash from key, using: " + key);
+            }
+
+            logger.info("[AWSS3Utility] Downloading file with key: " + key + " from bucket: " + BUCKET_NAME);
+
             software.amazon.awssdk.services.s3.model.GetObjectRequest getObjectRequest =
                     software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
                             .bucket(BUCKET_NAME)
@@ -179,12 +201,16 @@ public class AWSS3Utility {
                             .build();
 
             // Get object as input stream directly
-            return s3Client.getObject(getObjectRequest, ResponseTransformer.toInputStream());
+            InputStream result = s3Client.getObject(getObjectRequest, ResponseTransformer.toInputStream());
+            logger.info("[AWSS3Utility] Successfully opened stream for file: " + key);
+            return result;
         } catch (software.amazon.awssdk.services.s3.model.NoSuchKeyException e) {
             // Object not found
+            logger.warning("[AWSS3Utility] Object not found in S3 during download: " + key);
             return null;
         } catch (software.amazon.awssdk.services.s3.model.S3Exception e) {
             // Other error
+            logger.severe("[AWSS3Utility] S3 error while downloading: " + e.getMessage());
             throw e;
         }
     }

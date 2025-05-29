@@ -149,6 +149,15 @@
             background-color: #2a5ad0;
         }
 
+        .download-btn {
+            background-color: #4caf50;
+            color: white;
+        }
+
+        .download-btn:hover {
+            background-color: #45a049;
+        }
+
         .no-games {
             text-align: center;
             padding: 3rem;
@@ -228,18 +237,24 @@
                     <a href="${pageContext.request.contextPath}/games/view?id=<%= game.getGameId() %>" class="game-btn view-btn">
                         <i class="fas fa-eye"></i> View
                     </a>
+                    <a href="${pageContext.request.contextPath}/games/download?id=<%= game.getGameId() %>" class="game-btn download-btn">
+                        <i class="fas fa-download"></i> Download
+                    </a>
                     <a href="${pageContext.request.contextPath}/games/edit?id=<%= game.getGameId() %>" class="game-btn edit-btn">
                         <i class="fas fa-edit"></i> Edit
                     </a>
                 </div>
             </div>
         </div>
-        <% } %>
+        <%
+            }
+        %>
     </div>
-    <% } %>
+    <%
+    }
+    %>
 </div>
 
 <!-- Include Footer -->
-
 </body>
 </html>
