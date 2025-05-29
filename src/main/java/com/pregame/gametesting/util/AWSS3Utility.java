@@ -75,12 +75,12 @@ public class AWSS3Utility {
             String sanitizedFileName = sanitizeFileName(fileName);
             String fileKey = "uploads/" + uniqueId + "_" + sanitizedFileName;
 
-            // Configure upload request with public-read ACL
+            // Configure upload request without ACL (for buckets with Object Ownership set to "Bucket owner enforced")
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(BUCKET_NAME)
                     .key(fileKey)
                     .contentType(contentType)
-                    .acl(ObjectCannedACL.PUBLIC_READ) // Make the file publicly readable
+                    // Removed ACL setting as the bucket doesn't allow ACLs
                     .build();
 
             // Upload file to S3
