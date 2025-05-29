@@ -266,36 +266,32 @@ public class GameDAO {
     }
 
 
+    /**
+     * Updates a game in the database
+     *
+     * @param game The Game object with updated values
+     * @return true if update was successful, false otherwise
+     * @throws SQLException if a database error occurs
+     */
     public boolean updateGame(Game game) throws SQLException {
-        String sql = "UPDATE Game SET Title=?, ReleaseDate=?, ESRB=?, Type=?, Size=?, Version=?, GameDeveloperID=?, DescriptionofGame=?, DownloadURL=? WHERE GameID=?";
-        Connection conn = null;
-        PreparedStatement stmt = null;
-        boolean success = false;
+        String sql = "UPDATE Game SET Title = ?, ESRB = ?, Type = ?, Version = ?, DescriptionofGame = ? WHERE GameID = ?";
 
-        try {
-            conn = getConnection();
-            stmt = conn.prepareStatement(sql);
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, game.getTitle());
-            if (game.getReleaseDate() != null) {
-                stmt.setDate(2, new java.sql.Date(game.getReleaseDate().getTime()));
-            } else {
-                stmt.setNull(2, Types.DATE);
-            }
-            stmt.setString(3, game.getEsrbRating());
-            stmt.setString(4, game.getType());
-            stmt.setBigDecimal(5, game.getSize());
-            stmt.setString(6, game.getVersion());
-            stmt.setInt(7, game.getGameDeveloperId()); // Assumes game object has the ID
-            stmt.setString(8, game.getDescription());
-            stmt.setString(9, game.getDownloadUrl()); // Set downloadUrl
-            stmt.setInt(10, game.getGameId());
+            stmt.setString(2, game.getEsrbRating());
+            stmt.setString(3, game.getType());
+            stmt.setString(4, game.getVersion());
+            stmt.setString(5, game.getDescription());
+            stmt.setInt(6, game.getGameId());
 
-            success = stmt.executeUpdate() > 0;
-        } finally {
-            closeResources(conn, stmt, null);
+            int rowsAffected = stmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating game: " + e.getMessage());
+            throw e;
         }
-        return success;
     }
 
     public boolean deleteGame(int gameId) throws SQLException {

@@ -197,7 +197,7 @@
   <form method="post" action="${pageContext.request.contextPath}/profile/update-developer-picture" enctype="multipart/form-data">
     <div class="profile-section">
       <div class="profile-pic-container">
-        <img src="${pageContext.request.contextPath}/images/default-profile.png" alt="Profile Picture" class="profile-pic">
+        <img src="${pageContext.request.contextPath}/images/default-profile.png" class="profile-pic">
         <%-- For actual photo change, you'd need an <input type="file"> and JS or a submit button --%>
         <label class="change-photo-btn" for="developerProfilePicInput"> <%-- Point 'for' to an input id --%>
           <i class="fas fa-camera"></i> Change Photo

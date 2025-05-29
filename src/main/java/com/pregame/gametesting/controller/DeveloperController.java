@@ -1,6 +1,7 @@
 package com.pregame.gametesting.controller;
 
 import com.pregame.gametesting.dao.GameDAO;
+import com.pregame.gametesting.dao.ReviewDAO;
 import com.pregame.gametesting.model.Game;
 import com.pregame.gametesting.dao.TesterFeedbackDAO;
 import com.pregame.gametesting.model.Review; // <--- IMPORT THIS
@@ -15,17 +16,22 @@ import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
     // Keep if used elsewhere
 
 @WebServlet(urlPatterns ={"/developer/*","/developer/reviews-feedbacks", "/upload-game"})
 public class DeveloperController extends HttpServlet {
+    private static final Logger logger = Logger.getLogger(DeveloperController.class.getName());
 
     private GameDAO gameDAO;
     private TesterFeedbackDAO testerFeedbackDAO; // Already declared
+    private ReviewDAO reviewDAO; // Added ReviewDAO
 
     public DeveloperController() {
         this.gameDAO = new GameDAO();
         this.testerFeedbackDAO = new TesterFeedbackDAO(); // Already instantiated
+        this.reviewDAO = new ReviewDAO(); // Initialize ReviewDAO
     }
 
     @Override
@@ -35,7 +41,7 @@ public class DeveloperController extends HttpServlet {
         String action = request.getPathInfo();
         String servletPath = request.getServletPath();
 
-        System.out.println("DeveloperController: ServletPath=" + servletPath + ", PathInfo=" + action);
+        logger.info("DeveloperController: ServletPath=" + servletPath + ", PathInfo=" + action);
 
         // Normalize action for direct mapping
         if (servletPath.equals("/developer/reviews-feedbacks") && (action == null || action.equals("/"))) {
@@ -138,7 +144,7 @@ public class DeveloperController extends HttpServlet {
 
 
 
-    // NEW METHOD to show developer feedback
+    // Updated method to show developer feedback with proper tester names
     private void showDeveloperFeedback(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
@@ -149,45 +155,43 @@ public class DeveloperController extends HttpServlet {
         }
 
         User user = (User) session.getAttribute("user");
-        if (!User.TYPE_DEVELOPER.equals(user.getUserType())) { // Use .equals for string comparison
+        if (!User.TYPE_DEVELOPER.equals(user.getUserType())) {
             request.setAttribute("errorMessage", "Access denied. Only developers can view feedback.");
-            System.out.println("User is not a developer (type: " + user.getUserType() + "). Cannot view feedback.");
-            // Forward to a relevant page with error message
-            request.getRequestDispatcher("/jsp/Profiles/developer_profile.jsp").forward(request, response); // Or an error page
+            logger.warning("User is not a developer (type: " + user.getUserType() + "). Cannot view feedback.");
+            request.getRequestDispatcher("/jsp/Profiles/developer_profile.jsp").forward(request, response);
             return;
         }
 
         int developerId = getDeveloperIdFromSession(user);
-        if (developerId == -1) { // Indicates an issue getting ID
+        if (developerId == -1) {
             request.setAttribute("errorMessage", "Could not determine Developer ID to fetch feedback.");
             request.getRequestDispatcher("/jsp/Profiles/developer_profile.jsp").forward(request, response);
             return;
         }
 
-        System.out.println("Fetching feedback for developer ID: " + developerId);
+        logger.info("Fetching feedback for developer ID: " + developerId);
 
         try {
-            // Fetch feedback list for the developer
-            List<Review> feedbackList = testerFeedbackDAO.getFeedbackForDeveloper(developerId);
+            // Use the new ReviewDAO to get reviews with actual tester names
+            List<Review> feedbackList = reviewDAO.getReviewsByDeveloperId(developerId);
 
-            // Fetch developer name
-            String developerName = testerFeedbackDAO.getDeveloperName(developerId);
+            // Set developer name from user
+            String developerName = user.getName();
 
             // Set attributes for the JSP
             request.setAttribute("feedbackList", feedbackList);
             request.setAttribute("developerName", developerName);
-            request.setAttribute("requestedDeveloperId", developerId);
 
-            System.out.println("Fetched " + (feedbackList != null ? feedbackList.size() : "null") +
+            logger.info("Fetched " + (feedbackList != null ? feedbackList.size() : "null") +
                     " feedback items for developer: " + developerName + " (ID: " + developerId + ")");
 
-            // Forward to the JSP (ensure this path is correct)
+            // Forward to the JSP
             request.getRequestDispatcher("/jsp/developer/developer_reviews_feedbacks.jsp").forward(request, response);
 
-        } catch (Exception e) { // Catch a broader exception for safety
-            System.err.println("Error retrieving developer feedback for ID " + developerId + ": " + e.getMessage());
-            e.printStackTrace();
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error retrieving developer feedback for ID " + developerId, e);
             request.setAttribute("errorMessage", "An error occurred while retrieving feedback: " + e.getMessage());
+            request.getRequestDispatcher("/jsp/error.jsp").forward(request, response);
         }
     }
 
